@@ -1,0 +1,29 @@
+CXX = g++
+CXXFLAGS = -static -Wall -std=c++20 -O2 -march=native \
+            -Isrc -Isrc/utils -Isrc/algorithms/cooley-tuckey -Isrc/algorithms/stockham -Iconfig
+VPATH = src src/algorithms/cooley-tuckey src/algorithms/stockham src/utils config
+
+# Output directory
+BUILD_DIR = build
+
+# Executables to produce
+TARGETS = \
+	prova run_prova
+
+# Prepend build/ to all target names
+OUT_TARGETS = $(addprefix $(BUILD_DIR)/,$(TARGETS))
+
+# Default rule
+all: $(OUT_TARGETS)
+
+$(BUILD_DIR)/prova: prova.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR)/run_prova: run_prova.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+clean:
+	rm -rf $(BUILD_DIR)
