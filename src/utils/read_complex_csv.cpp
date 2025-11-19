@@ -1,33 +1,34 @@
-#include <vector>
-#include <complex>
+#include "read_complex_csv.h"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <iostream>
 
-std::vector<std::complex<double>> read_complex_csv(const std::string& filename, size_t length) {
+std::vector<std::complex<double>> read_complex_csv(const std::string& filename) {
     std::vector<std::complex<double>> result;
     std::ifstream file(filename);
-    
+
     if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file: " + filename);
+        throw std::runtime_error("Error: could not open file " + filename);
     }
-    
+
     std::string line;
-    size_t count = 0;
-    
-    while (std::getline(file, line) && count < length) {
-        if (line.empty()) continue;
-        
-        std::istringstream iss(line);
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
         double real, imag;
         char comma;
-        
-        if (iss >> real >> comma >> imag) {
+
+        if (ss >> real >> comma >> imag) {
             result.emplace_back(real, imag);
-            count++;
         }
     }
-    
-    file.close();
+
     return result;
+}
+
+int main() {
+    std::vector<std::complex<double>> vec = read_complex_csv("data/inputs/complex_1024.txt");
+    std::cout << "Read " << vec.size() << " complex numbers from the CSV file." << std::endl;
+    std::cout << "First complex number: " << vec[0] << std::endl;
+    return 0;
 }
