@@ -68,13 +68,15 @@ void fft_stockham(f64* __restrict__ re, f64* __restrict__ im,
 			// Calculate input indices for Stockham pattern
 			// base_in_0 = group * halfp + (j % halfp)
 			svuint64_t j_in_group = svand_x(active_pred, indices, halfp-1);
-			svuint64_t base_in_0 = svmad_x(active_pred, group_num, halfp, j_in_group);
-			svuint64_t base_in_1 = svadd_x(active_pred, base_in_0, n/2);
+			svuint64_t base_in_0 = svmul_n_u64_x(active_pred, group_num, halfp);
+			base_in_0 = svadd_x(active_pred, base_in_0, j_in_group);
+			svuint64_t base_in_1 = svadd_n_u64_x(active_pred, base_in_0, n/2);
 			
 			// Calculate output indices
 			// base_out_even = group * p + (j % halfp)
-			svuint64_t base_out_even = svmad_x(active_pred, group_num, p, j_in_group);
-			svuint64_t base_out_odd = svadd_x(active_pred, base_out_even, halfp);
+			svuint64_t base_out_even = svmul_n_u64_x(active_pred, group_num, p);
+			base_out_even = svadd_x(active_pred, base_out_even, j_in_group);
+			svuint64_t base_out_odd = svadd_n_u64_x(active_pred, base_out_even, halfp);
 			
 			// Load twiddle factors
 			svuint64_t root_indices = svlsl_x(active_pred, j_in_group, logn-logp);
