@@ -33,7 +33,7 @@ sizes=(
 
 ###########################################
 for exe in "${executables[@]}"; do
-    EXE_PATH="${BILD_DIR}/${exe}"
+    EXE_PATH="${BUILD_DIR}/${exe}"
 
     if [[ ! -x "$EXE_PATH" ]]; then
         echo "Executable not found: $EXE_PATH"
