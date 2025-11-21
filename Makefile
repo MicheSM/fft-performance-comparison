@@ -11,7 +11,8 @@ TARGETS = \
 	fft_cooley_bi_novector fft_cooley_bi_auto fft_cooley_bi_sve fft_cooley_bi_sve_3loop \
 	fft_cooley_ci_novector fft_cooley_ci_auto fft_cooley_ci_sve fft_cooley_ci_sve_3loop \
 	fft_stockham_bi_novector fft_stockham_bi_auto fft_stockham_bi_sve \
-	fft_stockham_ci_novector fft_stockham_ci_auto fft_stockham_ci_sve
+	fft_stockham_ci_novector fft_stockham_ci_auto fft_stockham_ci_sve \
+	fft_stockham_bi_sve_2loop
 
 # Prepend build/ to all target names
 OUT_TARGETS = $(addprefix $(BUILD_DIR)/,$(TARGETS))
@@ -54,6 +55,9 @@ $(BUILD_DIR)/fft_stockham_bi_auto: fft_stockham_bi.cpp timer.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -DPRAGMA_VECTOR -fopt-info-vec $^ -o $@
 
 $(BUILD_DIR)/fft_stockham_bi_sve: fft_stockham_bi_sve.cpp timer.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR)/fft_stockham_bi_sve_2loop: fft_stockham_bi_sve_2loop.cpp timer.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(BUILD_DIR)/fft_stockham_ci_novector: fft_stockham_ci.cpp timer.cpp | $(BUILD_DIR)

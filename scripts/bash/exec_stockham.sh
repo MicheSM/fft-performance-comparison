@@ -20,6 +20,7 @@ executables=(
     fft_stockham_bi_novector
     fft_stockham_bi_auto
     fft_stockham_bi_sve
+    fft_stockham_bi_sve_2loop
     fft_stockham_ci_novector
     fft_stockham_ci_auto
     fft_stockham_ci_sve
