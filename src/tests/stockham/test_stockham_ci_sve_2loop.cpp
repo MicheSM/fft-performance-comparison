@@ -88,9 +88,6 @@ void fft_stockham(cf64* __restrict__ wave, cf64* __restrict__ wave_tmp,
 	f64* wave_tmp_data = (f64*) wave_tmp;
 	f64* roots_data = (f64*) roots;
 	
-	// No bit reversal needed for Stockham!
-	fft_timer.print_time("fft bit reversal done");
-	
 	// Pointers for ping-pong buffering
 	f64 *data_in = wave_data;
 	f64 *data_out = wave_tmp_data;
