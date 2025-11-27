@@ -67,9 +67,6 @@ void fft_stockham(f64* __restrict__ re, f64* __restrict__ im,
 	u64 logn = 63 - __builtin_clzll(n);
 	u64 vector_step = svcntd();
 	
-	// No bit reversal needed for Stockham!
-	fft_timer.print_time("fft bit reversal done");
-	
 	// Pointers for ping-pong buffering
 	f64 *re_in = re, *im_in = im;
 	f64 *re_out = re_tmp, *im_out = im_tmp;
