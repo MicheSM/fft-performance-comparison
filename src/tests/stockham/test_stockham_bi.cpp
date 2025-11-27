@@ -24,25 +24,10 @@ using std::endl;
 typedef uint64_t u64;
 typedef double f64;
 
-struct cf64{
-	f64 re;
-	f64 im;
-};
-
-inline cf64 operator+(const cf64& a, const cf64& b){
-	return {a.re+b.re, a.im + b.im};
-}
-inline cf64 operator-(const cf64& a, const cf64& b){
-	return {a.re-b.re, a.im-b.im};
-}
-inline cf64 operator*(const cf64& a, const cf64& b){
-	return {a.re*b.re - a.im*b.im, a.re*b.im + a.im*b.re};
-}
-
 
 // Private function prototypes
 static vector<complex<double> > naiveDft(const complex<double> *input, size_t n);
-void init_roots(cf64* roots, u64 n);
+void init_roots(f64* __restrict__ cosines, f64* __restrict__ sines, u64 n);
 // Global variables
 const f64 pi = M_PI;
 static std::default_random_engine randGen((std::random_device())());
@@ -62,52 +47,83 @@ static vector<complex<double> > naiveDft(const complex<double> *input, size_t n)
 	return output;
 }
 
-void init_roots(cf64* roots, u64 n){
-	for(u64 i = 0; i < n/2; ++i) roots[i].im = sin(-2*pi*(f64)i/n);
-	if(n==2){ // non posso sfruttare cos(x) = sin(x + pi/2) perchè calcolo sono in 0 e pi
-		roots[0].re = 1;
-		roots[1].re = 0;
+void init_roots(f64* __restrict__ cosines, f64* __restrict__ sines, u64 n){
+	for(u64 i = 0; i < n/2; ++i) sines[i] = sin(-2*pi*(f64)i/n);
+	if(n == 2){ // non posso sfruttare cos(x) = sin(x + pi/2) perché calcolo solo in 0 e pi
+		cosines[0] = 1;
+		cosines[1] = 0;
 	}
-	else { // i segni sono al contrario perche gli angoli sono negativi
-		for(u64 i = 0; i < n/4; ++i) roots[i].re = -roots[i+n/4].im;
-		for(u64 i = n/4; i < n/2; ++i) roots[i].re = roots[i-n/4].im;
+	else { // i segni sono al contrario perché gli angoli sono negativi
+		for(u64 i = 0; i < n/4; ++i) cosines[i] = -sines[i+n/4];
+		for(u64 i = n/4; i < n/2; ++i) cosines[i] = sines[i-n/4];
 	}
 }
 
-void fft_stockham(cf64* __restrict__ wave, cf64* __restrict__ wave_tmp,
-		  cf64* __restrict__ roots, u64 n){
+void fft_stockham(f64* __restrict__ re, f64* __restrict__ im, 
+                  f64* __restrict__ re_tmp, f64* __restrict__ im_tmp,
+                  f64* __restrict__ cosines, f64* __restrict__ sines, u64 n){
 	assert((n & (n-1)) == 0 && n > 0); // n deve essere una potenza di due
 	u64 logn = 63 - __builtin_clzll(n);
-
-	cf64 *wave_in = wave;
-	cf64 *wave_out = wave_tmp;
-
+	
+	// Pointers for ping-pong buffering
+	f64 *re_in = re, *im_in = im;
+	f64 *re_out = re_tmp, *im_out = im_tmp;
+	
 	for(u64 logp = 1; logp <= logn; ++logp){
 		u64 p = 1 << logp;
 		u64 halfp = p >> 1;
 		u64 num_groups = n / p;
-
+		
 		for(u64 group = 0; group < num_groups; ++group){
 			for(u64 j = 0; j < halfp; ++j){
-				// stockham indexing pattern
-				u64 idx_in_0 = group * halfp + j; // prima metà dell'input
-				u64 idx_in_1 = idx_in_0 + n/2;    // seconda metà dell'input
-				u64 idx_out_even = group * p + j; // output pari
-				u64 idx_out_odd = idx_out_even + halfp; // output dispari
-			
-				// Twiddle factor and butterfly
-				cf64 w = roots[j <<(logn-logp)];
-				cf64 val0 = wave_in[idx_in_0];
-				cf64 val1 = wave_in[idx_in_1];
-				cf64 z = w * val1;
+				// Stockham indexing pattern
+				u64 idx_in_0 = group * halfp + j;  // First half of input
+				u64 idx_in_1 = idx_in_0 + n/2;     // Second half of input
+				u64 idx_out_even = group * p + j;  // Even output
+				u64 idx_out_odd = idx_out_even + halfp; // Odd output
 
-				wave_out[idx_out_even] = val0 + z;
-				wave_out[idx_out_odd] = val0 - z;
-			}	
+				//cout << "upper: " << idx_in_0 << " lower: " << idx_in_1 << " even: " << idx_out_even << " odd: " << idx_out_odd << endl;
+				
+				// Twiddle factor
+				f64 wre = cosines[j << (logn-logp)];
+				f64 wim = sines[j << (logn-logp)];
+				
+				//cout << "twiddle real: " << wre << " twiddle imag: " << wim << endl;
+				
+				// compute twiddle = exp(-2i * pi * j * 2^(logn-logp) / n) and print it
+				/*
+				u64 stride = 1ULL << (logn - logp);
+				f64 angle_tw = 2.0 * pi * (f64)j * (f64)stride / (f64)n;
+				std::complex<double> twiddle = std::exp(std::complex<double>(0.0, -angle_tw));
+				cout << "computed twiddle: " << twiddle.real() << "," << twiddle.imag() << endl;
+				*/
+				
+				// Load input values
+				f64 re0 = re_in[idx_in_0];
+				f64 im0 = im_in[idx_in_0];
+				f64 re1 = re_in[idx_in_1];
+				f64 im1 = im_in[idx_in_1];
+				
+				// Complex multiply with twiddle
+				f64 zre = wre * re1 - wim * im1;
+				f64 zim = wre * im1 + wim * re1;
+				
+				// Butterfly computation
+				re_out[idx_out_even] = re0 + zre;
+				im_out[idx_out_even] = im0 + zim;
+				re_out[idx_out_odd] = re0 - zre;
+				im_out[idx_out_odd] = im0 - zim;
+
+				//cout << "even -> " << re_out[idx_out_even] << " " << im_out[idx_out_even] << endl;
+				//cout << "odd -> " << re_out[idx_out_odd] << " " << im_out[idx_out_odd] << endl;
+			}
 		}
-
-		std::swap(wave_in, wave_out);
+		
+		// Swap buffers for next iteration
+		std::swap(re_in, re_out);
+		std::swap(im_in, im_out);
 	}
+    
 }
 
 int main(){
@@ -138,16 +154,19 @@ int main(){
 		
 		
 		// calculate fft transform
-		cf64* wave = new cf64[n];
-		cf64* wave_tmp = new cf64[n];
+		f64* re = new f64[n];
+		f64* im = new f64[n];
+		f64* re_tmp = new f64[n];
+		f64* im_tmp = new f64[n];
 		
 		for(u64 i = 0; i < n; ++i){
-			wave[i].re = vec[i].real();
-			wave[i].im = vec[i].imag();
+			re[i] = vec[i].real();
+			im[i] = vec[i].imag();
 		}
 		
-		cf64* roots = new cf64[n/2];
-		init_roots(roots,n);
+		f64* cosines = new f64[n/2];
+		f64* sines = new f64[n/2];
+		init_roots(cosines, sines, n);
 
 		/*
 		for (size_t i = 0; i < n; i++){
@@ -157,7 +176,7 @@ int main(){
 			cout << "twiddle["<< i << "] = " << cosines[i] << "," << sines[i] << endl;
 		}
 		*/
-		fft_stockham(wave, wave_tmp, roots, n);
+		fft_stockham(re, im, re_tmp, im_tmp, cosines, sines, n);
 		/*
 		for (size_t i = 0; i < n; i++){
 			cout << "vec["<< i << "] = " << re_tmp[i] << "," << im_tmp[i] << endl;
@@ -168,12 +187,12 @@ int main(){
 
 			for(u64 i = 0; i < n; ++i){
 				
-				vec[i] = complex<double>(wave[i].re, wave[i].im);
+				vec[i] = complex<double>(re[i], im[i]);
 			}
 		} else {
 			for(u64 i = 0; i < n; ++i){
 				
-				vec[i] = complex<double>(wave_tmp[i].re, wave_tmp[i].im);
+				vec[i] = complex<double>(re_tmp[i], im_tmp[i]);
 			}
 		}
 
@@ -186,9 +205,12 @@ int main(){
 			}
 		}
 		cout << "N = " << n << " - max absolute error: " << max_err << endl;
-		delete[] wave;
-		delete[] wave_tmp;
-		delete[] roots;
+		delete[] re;
+		delete[] im;
+		delete[] re_tmp;
+		delete[] im_tmp;
+		delete[] cosines;
+		delete[] sines;
 		delete[] vec;
 	}
 }
