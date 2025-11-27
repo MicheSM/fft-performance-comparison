@@ -45,13 +45,8 @@ void fft_stockham(f64* __restrict__ re, f64* __restrict__ im,
 		u64 halfp = p >> 1;
 		
 		for(u64 i = 0; i < n; i += vector_step){
-			// Skip if we're in the "odd half" of any group
-			// This corresponds to j >= halfp in the original
-			u64 j_in_group = i % p;
-			if(j_in_group >= halfp) {
-				i += halfp;
-				if(i >= n) break;
-			}
+			// Skip if we're in the second half of a group
+			if(i & halfp) i += halfp;
 			
 			svbool_t buffer_pred = svwhilelt_b64(i, n);
 			svuint64_t indices = svindex_u64(i, 1);

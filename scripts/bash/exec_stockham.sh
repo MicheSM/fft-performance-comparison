@@ -24,6 +24,7 @@ executables=(
     fft_stockham_ci_novector
     fft_stockham_ci_auto
     fft_stockham_ci_sve
+    fft_stockham_ci_sve_2loop
 )
 
 sizes=(

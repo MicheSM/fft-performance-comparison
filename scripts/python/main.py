@@ -100,14 +100,15 @@ def main():
         'output_fft_stockham_bi_sve_2loop',
         'output_fft_stockham_ci_novector',
         'output_fft_stockham_ci_auto',
-        'output_fft_stockham_ci_sve'
+        'output_fft_stockham_ci_sve',
+        'output_fft_stockham_ci_sve_2loop'
     ]
 
     colors = [
         'skyblue', 'dodgerblue', 'blue', 'darkblue',
         'lightgray', 'darkgray', 'gray', 'black',
         'lightsalmon', 'red', 'darkred', 'green',
-        'yellow', 'gold', 'darkgoldenrod'
+        'yellow', 'gold', 'darkgoldenrod', 'purple'
     ]
 
     fmts = [

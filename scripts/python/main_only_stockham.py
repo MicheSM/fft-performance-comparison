@@ -100,7 +100,8 @@ def main():
         'output_fft_stockham_bi_sve_2loop',
         'output_fft_stockham_ci_novector',
         'output_fft_stockham_ci_auto',
-        'output_fft_stockham_ci_sve'
+        'output_fft_stockham_ci_sve',
+        'output_fft_stockham_ci_sve_2loop'
     ]
 
     colors = [
@@ -113,8 +114,8 @@ def main():
     fmts = [
         #'o--', 'o--', 'o--', 'o--',
         #'o-',  'o-',  'o-',  'o-',
-        'o:',  'o:',  'o:', 'o:',
-        'o-.', 'o-.', 'o-.'
+        'o:',  'o:',  'o:',   'o:',
+        'o-.', 'o-.', 'o-.',  'o-.'
     ]
 
     algorithm_colors = {name: c for name, c in zip(algorithm_names, colors)}
