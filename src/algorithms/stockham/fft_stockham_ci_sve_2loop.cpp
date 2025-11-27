@@ -53,9 +53,6 @@ void fft_stockham(cf64* __restrict__ wave, cf64* __restrict__ wave_tmp,
 	f64* wave_tmp_data = (f64*) wave_tmp;
 	f64* roots_data = (f64*) roots;
 	
-	// No bit reversal needed for Stockham!
-	fft_timer.print_time("fft bit reversal done");
-	
 	// Pointers for ping-pong buffering
 	f64 *data_in = wave_data;
 	f64 *data_out = wave_tmp_data;
@@ -66,62 +63,61 @@ void fft_stockham(cf64* __restrict__ wave, cf64* __restrict__ wave_tmp,
 		
 		for(u64 i = 0; i < n; i += vector_step/2){
 			// Skip if we're in the second half of a group
-			// (corresponds to j >= halfp in original)
-			u64 j_in_group = i % p;
-			if(j_in_group >= halfp) {
-				i += halfp;
-				if(i >= n) break;
-			}
+			if(i & halfp) i += halfp;
 			
 			svbool_t buffer_pred = svwhilelt_b64(2*i, 2*n);
 			
-			// Create indices at complex level: i, i, i+1, i+1, i+2, i+2, ...
+			// Create indices at double level: 2i, 2i+1, 2i+2, 2i+3, ...
+			// Then convert to complex level: i, i, i+1, i+1, ...
 			svuint64_t indices = svindex_u64(2*i, 1);
-			indices = svlsr_x(buffer_pred, indices, 1);
+			indices = svlsr_x(buffer_pred, indices, 1);  // i, i, i+1, i+1, i+2, i+2, ...
 			
 			// Keep only indices where (index % p) < halfp
-			// (first half of each group)
-			svuint64_t mod_p = svand_z(buffer_pred, indices, p-1);
-			svbool_t valid_pred = svcmplt(buffer_pred, mod_p, halfp);
+			svuint64_t and_indices = svand_z(buffer_pred, indices, halfp);
+			svbool_t halfp_unset_pred = svcmpeq(buffer_pred, and_indices, 0);
 			
-			// Calculate group and j for each element
-			// group = index / p, j = index % p
-			svuint64_t group_idx = svlsr_x(valid_pred, indices, logp);
-			svuint64_t j = mod_p;
+			// Calculate group and j
+			svuint64_t group_idx = svlsr_x(halfp_unset_pred, indices, logp);
+			svuint64_t j = svand_x(halfp_unset_pred, indices, p-1);
 			
-			// Calculate input indices: base_in_0 = group * halfp + j
-			svuint64_t base_in_0 = svmla_x(valid_pred, j, group_idx, halfp);
-			svuint64_t base_in_1 = svadd_x(valid_pred, base_in_0, n/2);
+			// Calculate indices at COMPLEX level, then multiply by 2 for doubles
+			// base_in_0 = (group * halfp + j) * 2
+			svuint64_t base_in_0 = svmla_x(halfp_unset_pred, j, group_idx, halfp);
+			base_in_0 = svlsl_n_u64_x(halfp_unset_pred, base_in_0, 1);
 			
-			// Calculate output indices: base_out = group * p + j
-			svuint64_t base_out_even = svmla_x(valid_pred, j, group_idx, p);
-			svuint64_t base_out_odd = svadd_x(valid_pred, base_out_even, halfp);
+			// base_in_1 = base_in_0 + n (in doubles, so n complex * 2)
+			svuint64_t base_in_1 = svadd_x(halfp_unset_pred, base_in_0, n);
 			
-			// Convert complex indices to double indices (multiply by 2)
-			svuint64_t double_in_0 = svlsl_n_u64_x(valid_pred, base_in_0, 1);
-			svuint64_t double_in_1 = svlsl_n_u64_x(valid_pred, base_in_1, 1);
-			svuint64_t double_out_even = svlsl_n_u64_x(valid_pred, base_out_even, 1);
-			svuint64_t double_out_odd = svlsl_n_u64_x(valid_pred, base_out_odd, 1);
+			// base_out_even = (group * p + j) * 2
+			svuint64_t base_out_even = svmla_x(halfp_unset_pred, j, group_idx, p);
+			base_out_even = svlsl_n_u64_x(halfp_unset_pred, base_out_even, 1);
+			
+			// base_out_odd = base_out_even + halfp * 2
+			svuint64_t base_out_odd = svadd_x(halfp_unset_pred, base_out_even, halfp << 1);
+			
+			// Add re/im offset (0, 1, 0, 1, ...)
+			base_in_0 = svadd_x(halfp_unset_pred, base_in_0, sv_0101);
+			base_in_1 = svadd_x(halfp_unset_pred, base_in_1, sv_0101);
+			base_out_even = svadd_x(halfp_unset_pred, base_out_even, sv_0101);
+			base_out_odd = svadd_x(halfp_unset_pred, base_out_odd, sv_0101);
 			
 			// Load twiddle factors
-			// root_indices pattern: j, j, j+1, j+1, ... scaled and interleaved
-			svuint64_t root_indices = j;
-			root_indices = svlsl_x(valid_pred, root_indices, logn-logp+1);  // *= step, *= 2
-			root_indices = svorr_x(valid_pred, root_indices, sv_0101);  // interleave re/im
-			svfloat64_t w = svld1_gather_index(valid_pred, roots_data, root_indices);
+			svuint64_t root_indices = svlsl_x(halfp_unset_pred, j, logn-logp+1);
+			root_indices = svadd_x(halfp_unset_pred, root_indices, sv_0101);
+			svfloat64_t w = svld1_gather_index(halfp_unset_pred, roots_data, root_indices);
 			
-			// Load input values using gather (non-contiguous access)
-			svfloat64_t val0 = svld1_gather_index(valid_pred, data_in, double_in_0);
-			svfloat64_t val1 = svld1_gather_index(valid_pred, data_in, double_in_1);
+			// Load input values using gather
+			svfloat64_t val0 = svld1_gather_index(halfp_unset_pred, data_in, base_in_0);
+			svfloat64_t val1 = svld1_gather_index(halfp_unset_pred, data_in, base_in_1);
 			
 			// Complex multiply: z = w * val1
 			svfloat64_t z = svdup_f64(0);
-			z = svcmla_x(valid_pred, z, w, val1, 0);
-			z = svcmla_x(valid_pred, z, w, val1, 90);
+			z = svcmla_x(halfp_unset_pred, z, w, val1, 0);
+			z = svcmla_x(halfp_unset_pred, z, w, val1, 90);
 			
-			// Butterfly and scatter to output (non-contiguous access)
-			svst1_scatter_index(valid_pred, data_out, double_out_even, svadd_x(valid_pred, val0, z));
-			svst1_scatter_index(valid_pred, data_out, double_out_odd, svsub_x(valid_pred, val0, z));
+			// Butterfly and scatter to output
+			svst1_scatter_index(halfp_unset_pred, data_out, base_out_even, svadd_x(halfp_unset_pred, val0, z));
+			svst1_scatter_index(halfp_unset_pred, data_out, base_out_odd, svsub_x(halfp_unset_pred, val0, z));
 		}
 		
 		// Swap buffers for next iteration
