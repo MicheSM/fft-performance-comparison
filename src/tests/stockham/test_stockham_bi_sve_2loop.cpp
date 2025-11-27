@@ -67,46 +67,46 @@ void fft_stockham(f64* __restrict__ re, f64* __restrict__ im,
 	u64 logn = 63 - __builtin_clzll(n);
 	u64 vector_step = svcntd();
 	
+	// Pointers for ping-pong buffering
 	f64 *re_in = re, *im_in = im;
 	f64 *re_out = re_tmp, *im_out = im_tmp;
 	
 	for(u64 logp = 1; logp <= logn; ++logp){
 		u64 p = 1 << logp;
 		u64 halfp = p >> 1;
-		u64 num_groups = n / p;
-		u64 stride = 1 << (logp - 1);  // Input stride for this stage
 		
 		for(u64 i = 0; i < n; i += vector_step){
-			// Check if we're in the valid first-half region
+			// Skip if we're in the "odd half" of any group
+			// This corresponds to j >= halfp in the original
 			u64 j_in_group = i % p;
 			if(j_in_group >= halfp) {
-				// Skip to next group's first half
-				i = ((i / p) + 1) * p;
+				i += halfp;
 				if(i >= n) break;
-				j_in_group = 0;
 			}
 			
 			svbool_t buffer_pred = svwhilelt_b64(i, n);
 			svuint64_t indices = svindex_u64(i, 1);
 			
 			// Keep only indices where (index % p) < halfp
+			// i.e., we're in the first half of each group
 			svuint64_t mod_p = svand_z(buffer_pred, indices, p-1);
 			svbool_t valid_pred = svcmplt(buffer_pred, mod_p, halfp);
 			
-			// Calculate group and j for each element
+			// Calculate which group each element belongs to
 			svuint64_t group_idx = svlsr_n_u64_z(valid_pred, indices, logp);
-			svuint64_t j = mod_p;  // Already computed above
 			
-			// Stockham input pattern:
-			// The input is divided into segments of size stride
-			// For each output group, we read from two separated input positions
+			// j within the group (for twiddle factors)
+			svuint64_t j = svand_x(valid_pred, indices, p-1);
+			
+			// Calculate input indices for Stockham pattern
 			// base_in_0 = group * halfp + j
-			// base_in_1 = base_in_0 + stride * num_groups = base_in_0 + n/2
-			
+			// base_in_1 = base_in_0 + n/2
 			svuint64_t base_in_0 = svmla_x(valid_pred, j, group_idx, halfp);
 			svuint64_t base_in_1 = svadd_x(valid_pred, base_in_0, n/2);
 			
-			// Output indices
+			// Calculate output indices
+			// base_out_even = group * p + j
+			// base_out_odd = base_out_even + halfp
 			svuint64_t base_out_even = svmla_x(valid_pred, j, group_idx, p);
 			svuint64_t base_out_odd = svadd_x(valid_pred, base_out_even, halfp);
 			
@@ -115,25 +115,31 @@ void fft_stockham(f64* __restrict__ re, f64* __restrict__ im,
 			svfloat64_t wre = svld1_gather_index(valid_pred, cosines, root_indices);
 			svfloat64_t wim = svld1_gather_index(valid_pred, sines, root_indices);
 			
-			// Load input values
+			// Load input values using gather
 			svfloat64_t re0 = svld1_gather_index(valid_pred, re_in, base_in_0);
 			svfloat64_t im0 = svld1_gather_index(valid_pred, im_in, base_in_0);
 			svfloat64_t re1 = svld1_gather_index(valid_pred, re_in, base_in_1);
 			svfloat64_t im1 = svld1_gather_index(valid_pred, im_in, base_in_1);
 			
-			// Complex multiply
+			// Complex multiply with twiddle: z = w * val1
 			svfloat64_t zre = svmul_x(valid_pred, wre, re1);
 			zre = svmls_x(valid_pred, zre, wim, im1);
 			svfloat64_t zim = svmul_x(valid_pred, wre, im1);
 			zim = svmla_x(valid_pred, zim, wim, re1);
 			
-			// Butterfly and scatter
-			svst1_scatter_index(valid_pred, re_out, base_out_even, svadd_x(valid_pred, re0, zre));
-			svst1_scatter_index(valid_pred, im_out, base_out_even, svadd_x(valid_pred, im0, zim));
-			svst1_scatter_index(valid_pred, re_out, base_out_odd, svsub_x(valid_pred, re0, zre));
-			svst1_scatter_index(valid_pred, im_out, base_out_odd, svsub_x(valid_pred, im0, zim));
+			// Butterfly and scatter to output
+			svfloat64_t out_even_re = svadd_x(valid_pred, re0, zre);
+			svfloat64_t out_even_im = svadd_x(valid_pred, im0, zim);
+			svfloat64_t out_odd_re = svsub_x(valid_pred, re0, zre);
+			svfloat64_t out_odd_im = svsub_x(valid_pred, im0, zim);
+			
+			svst1_scatter_index(valid_pred, re_out, base_out_even, out_even_re);
+			svst1_scatter_index(valid_pred, im_out, base_out_even, out_even_im);
+			svst1_scatter_index(valid_pred, re_out, base_out_odd, out_odd_re);
+			svst1_scatter_index(valid_pred, im_out, base_out_odd, out_odd_im);
 		}
 		
+		// Swap buffers for next iteration
 		std::swap(re_in, re_out);
 		std::swap(im_in, im_out);
 	}
