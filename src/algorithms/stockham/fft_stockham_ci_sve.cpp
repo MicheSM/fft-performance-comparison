@@ -102,15 +102,6 @@ void fft_stockham(cf64* __restrict__ wave, cf64* __restrict__ wave_tmp,
 		// Swap buffers for next iteration
 		std::swap(data_in, data_out);
 	}
-	
-	// If odd number of stages, copy result back to original array
-	if(logn & 1){
-		for(u64 i = 0; i < 2*n; i += vector_step){
-			svbool_t predicate = svwhilelt_b64(i, 2*n);
-			svfloat64_t vals = svld1(predicate, &wave_tmp_data[i]);
-			svst1(predicate, &wave_data[i], vals);
-		}
-	}
 }
 
 int main(int argc, char const * argv[]){
