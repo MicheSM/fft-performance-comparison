@@ -45,6 +45,8 @@ void fft_stockham(cf64* __restrict__ wave, cf64* __restrict__ wave_tmp,
 	assert((n & (n-1)) == 0 && n > 0);
 	u64 logn = 63 - __builtin_clzll(n);
 	u64 vector_step = svcntd();
+	// No bit reversal needed for Stockham!
+	fft_timer.print_time("fft bit reversal done");
 	
 	// Setup for interleaved complex representation
 	svuint64_t sv_0101 = svindex_u64(0, 1);

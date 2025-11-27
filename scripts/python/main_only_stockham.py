@@ -108,7 +108,7 @@ def main():
         #'skyblue', 'dodgerblue', 'blue', 'darkblue',
         #'lightgray', 'darkgray', 'gray', 'black',
         'lightsalmon', 'red', 'darkred', 'green',
-        'yellow', 'gold', 'darkgoldenrod'
+        'yellow', 'gold', 'darkgoldenrod', 'purple'
     ]
 
     fmts = [

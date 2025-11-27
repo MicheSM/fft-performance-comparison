@@ -114,8 +114,8 @@ def main():
     fmts = [
         'o--', 'o--', 'o--', 'o--',
         'o-',  'o-',  'o-',  'o-',
-        'o:',  'o:',  'o:', 'o:',
-        'o-.', 'o-.', 'o-.'
+        'o:',  'o:',  'o:',  'o:',
+        'o-.', 'o-.', 'o-.', 'o-.'
     ]
 
     algorithm_colors = {name: c for name, c in zip(algorithm_names, colors)}
