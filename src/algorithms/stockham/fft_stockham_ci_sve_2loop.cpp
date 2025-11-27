@@ -128,6 +128,7 @@ void fft_stockham(cf64* __restrict__ wave, cf64* __restrict__ wave_tmp,
 		std::swap(data_in, data_out);
 	}
 }
+
 int main(int argc, char const * argv[]){
 	if(argc != 2){
 		std::cout << "expected 1 argument: n\n";
