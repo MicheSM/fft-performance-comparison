@@ -75,68 +75,68 @@ void fft_stockham(f64* __restrict__ re, f64* __restrict__ im,
 		u64 p = 1 << logp;
 		u64 halfp = p >> 1;
 		
-		// MERGED LOOP: iterate over all butterfly positions
-		for(u64 j = 0; j < n/2; j += vector_step){
-			// Skip if we're in the "odd" half of a group
-			// (j / halfp) & 1 tells us if we're in odd or even group half
-			if((j / halfp) & 1) {
-				j += halfp;
-				// Need to recheck bounds after skip
-				if(j >= n/2) break;
+		for(u64 i = 0; i < n; i += vector_step){
+			// Skip if we're in the "odd half" of any group
+			// This corresponds to j >= halfp in the original
+			u64 j_in_group = i % p;
+			if(j_in_group >= halfp) {
+				i += halfp;
+				if(i >= n) break;
 			}
 			
-			svbool_t predicate = svwhilelt_b64(j, n/2);
+			svbool_t buffer_pred = svwhilelt_b64(i, n);
+			svuint64_t indices = svindex_u64(i, 1);
 			
-			// Create indices for this vector
-			svuint64_t indices = svindex_u64(j, 1);
+			// Keep only indices where (index % p) < halfp
+			// i.e., we're in the first half of each group
+			svuint64_t mod_p = svand_z(buffer_pred, indices, p-1);
+			svbool_t valid_pred = svcmplt(buffer_pred, mod_p, halfp);
 			
-			// Filter to only elements in "even" half of their group
-			// For position j, we want (j % p) < halfp
-			svuint64_t position_in_group = svand_z(predicate, indices, p-1);
-			svbool_t active_pred = svcmplt(predicate, position_in_group, halfp);
+			// Calculate which group each element belongs to
+			svuint64_t group_idx = svlsr_n_u64_z(valid_pred, indices, logp);
 			
-			// Compute group number for each element
-			svuint64_t group_num = svlsr_x(active_pred, indices, logp-1);
+			// j within the group (for twiddle factors)
+			svuint64_t j = svand_x(valid_pred, indices, p-1);
 			
 			// Calculate input indices for Stockham pattern
-			// base_in_0 = group * halfp + (j % halfp)
-			svuint64_t j_in_group = svand_x(active_pred, indices, halfp-1);
-			svuint64_t base_in_0 = svmul_n_u64_x(active_pred, group_num, halfp);
-			base_in_0 = svadd_x(active_pred, base_in_0, j_in_group);
-			svuint64_t base_in_1 = svadd_n_u64_x(active_pred, base_in_0, n/2);
+			// base_in_0 = group * halfp + j
+			// base_in_1 = base_in_0 + n/2
+			svuint64_t base_in_0 = svmla_x(valid_pred, j, group_idx, halfp);
+			svuint64_t base_in_1 = svadd_x(valid_pred, base_in_0, n/2);
 			
 			// Calculate output indices
-			// base_out_even = group * p + (j % halfp)
-			svuint64_t base_out_even = svmul_n_u64_x(active_pred, group_num, p);
-			base_out_even = svadd_x(active_pred, base_out_even, j_in_group);
-			svuint64_t base_out_odd = svadd_n_u64_x(active_pred, base_out_even, halfp);
+			// base_out_even = group * p + j
+			// base_out_odd = base_out_even + halfp
+			svuint64_t base_out_even = svmla_x(valid_pred, j, group_idx, p);
+			svuint64_t base_out_odd = svadd_x(valid_pred, base_out_even, halfp);
 			
 			// Load twiddle factors
-			svuint64_t root_indices = svlsl_x(active_pred, j_in_group, logn-logp);
-			svfloat64_t wre = svld1_gather_index(active_pred, cosines, root_indices);
-			svfloat64_t wim = svld1_gather_index(active_pred, sines, root_indices);
+			svuint64_t root_indices = svlsl_n_u64_m(valid_pred, j, logn-logp);
+			svfloat64_t wre = svld1_gather_index(valid_pred, cosines, root_indices);
+			svfloat64_t wim = svld1_gather_index(valid_pred, sines, root_indices);
 			
 			// Load input values using gather
-			svfloat64_t re0 = svld1_gather_index(active_pred, re_in, base_in_0);
-			svfloat64_t im0 = svld1_gather_index(active_pred, im_in, base_in_0);
-			svfloat64_t re1 = svld1_gather_index(active_pred, re_in, base_in_1);
-			svfloat64_t im1 = svld1_gather_index(active_pred, im_in, base_in_1);
+			svfloat64_t re0 = svld1_gather_index(valid_pred, re_in, base_in_0);
+			svfloat64_t im0 = svld1_gather_index(valid_pred, im_in, base_in_0);
+			svfloat64_t re1 = svld1_gather_index(valid_pred, re_in, base_in_1);
+			svfloat64_t im1 = svld1_gather_index(valid_pred, im_in, base_in_1);
 			
 			// Complex multiply with twiddle: z = w * val1
-			svfloat64_t zre = svmul_x(active_pred, wre, re1);
-			zre = svmls_x(active_pred, zre, wim, im1);
-			svfloat64_t zim = svmul_x(active_pred, wre, im1);
-			zim = svmla_x(active_pred, zim, wim, re1);
+			svfloat64_t zre = svmul_x(valid_pred, wre, re1);
+			zre = svmls_x(valid_pred, zre, wim, im1);
+			svfloat64_t zim = svmul_x(valid_pred, wre, im1);
+			zim = svmla_x(valid_pred, zim, wim, re1);
 			
-			// Butterfly and store using scatter
-			svst1_scatter_index(active_pred, re_out, base_out_even, 
-			                    svadd_x(active_pred, re0, zre));
-			svst1_scatter_index(active_pred, im_out, base_out_even, 
-			                    svadd_x(active_pred, im0, zim));
-			svst1_scatter_index(active_pred, re_out, base_out_odd, 
-			                    svsub_x(active_pred, re0, zre));
-			svst1_scatter_index(active_pred, im_out, base_out_odd, 
-			                    svsub_x(active_pred, im0, zim));
+			// Butterfly and scatter to output
+			svfloat64_t out_even_re = svadd_x(valid_pred, re0, zre);
+			svfloat64_t out_even_im = svadd_x(valid_pred, im0, zim);
+			svfloat64_t out_odd_re = svsub_x(valid_pred, re0, zre);
+			svfloat64_t out_odd_im = svsub_x(valid_pred, im0, zim);
+			
+			svst1_scatter_index(valid_pred, re_out, base_out_even, out_even_re);
+			svst1_scatter_index(valid_pred, im_out, base_out_even, out_even_im);
+			svst1_scatter_index(valid_pred, re_out, base_out_odd, out_odd_re);
+			svst1_scatter_index(valid_pred, im_out, base_out_odd, out_odd_im);
 		}
 		
 		// Swap buffers for next iteration
