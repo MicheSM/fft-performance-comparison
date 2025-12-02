@@ -5,6 +5,7 @@
 #include <cassert>
 #include <complex>
 #include <chrono>
+#include <algorithm>
 #include <limits>
 #include "config.h"
 #include <arm_sve.h>
@@ -143,8 +144,10 @@ int main(int argc, char const * argv[]){
 	using std::chrono::high_resolution_clock;
 	using std::chrono::time_point;
 	
-	double minimum_time = std::numeric_limits<double>::max();
-	for(int r = 0; r < 100; r++){
+	std::vector<double> times;
+	times.reserve(100);
+
+	for (int r = 0; r < 32; r++) {
 		auto startTime = high_resolution_clock::now();
 
 		fft_stockham(wave, wave_tmp, roots, n);
@@ -152,13 +155,26 @@ int main(int argc, char const * argv[]){
 		auto endTime = high_resolution_clock::now();
 
 		double elapsed = std::chrono::duration<double, std::nano>(endTime - startTime).count();
-
-		if (elapsed < minimum_time) {
-        	minimum_time = elapsed;
-    	}
+		times.push_back(elapsed);
 	}
-	cout << n << " " << minimum_time << endl; 
+
+	// sort the measured times
+	std::sort(times.begin(), times.end());
 	
+	// compute the median
+	double median_time;
+	int size = times.size();
+
+	if (size % 2 == 0) {
+		// even number of elements → average the two middle ones
+		median_time = (times[size/2 - 1] + times[size/2]) / 2.0;
+	} else {
+		// odd number of elements → middle element
+		median_time = times[size/2];
+	}
+	cout << n << " " << median_time << endl; 
+
+
 #ifndef DONTPRINT
 	for(u64 i = 0; i < n; ++i) std::cout << wave[i].re << " " << wave[i].im << "\n";
 #endif
