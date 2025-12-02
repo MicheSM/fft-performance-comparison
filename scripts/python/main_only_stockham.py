@@ -40,7 +40,7 @@ def create_plots(algorithms_data, colors, fmts, output_dir):
         "execution time"
     ]
 
-    for checkpoint in range(1, 10):
+    for checkpoint in range(1, 2):
         plt.figure(figsize=(15, 10))
         baseline_col = baseline_data["time"]
 
