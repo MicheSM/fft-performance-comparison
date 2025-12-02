@@ -48,7 +48,7 @@ for exe in "${executables[@]}"; do
 
     {
         for n in "${sizes[@]}"; do
-            for r in {1..4}; do
+            for r in {1..8}; do
                 taskset -c 10 "$EXE_PATH" "$n"
             done
         done

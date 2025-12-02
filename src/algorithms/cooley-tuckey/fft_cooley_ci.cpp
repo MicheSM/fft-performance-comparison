@@ -101,9 +101,9 @@ int main(int argc, char const * argv[]){
 	using std::chrono::time_point;
 	
 	std::vector<double> times;
-	times.reserve(100);
+	times.reserve(8);
 
-	for (int r = 0; r < 32; r++) {
+	for (int r = 0; r < 8; r++) {
 		auto startTime = high_resolution_clock::now();
 
 		fft(wave, roots, n);
