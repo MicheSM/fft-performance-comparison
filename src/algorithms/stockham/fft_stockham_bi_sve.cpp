@@ -3,15 +3,14 @@
 #include <cmath>
 #include <cstdint>
 #include <cassert>
+#include <chrono>
+#include <limits>
 #include <arm_sve.h>
-#include "timer.h"
-#include "config.h"
 using std::cout, std::endl;
 typedef uint64_t u64;
 typedef double f64;
 
 const f64 pi = M_PI;
-timer fft_timer;
 
 void init_roots(f64* __restrict__ cosines, f64* __restrict__ sines, u64 n){
 	for(u64 i = 0; i < n/2; ++i) sines[i] = sin(-2*pi*(f64)i/n);
@@ -31,10 +30,7 @@ void fft_stockham(f64* __restrict__ re, f64* __restrict__ im,
 	assert((n & (n-1)) == 0 && n > 0);
 	u64 logn = 63 - __builtin_clzll(n);
 	u64 vector_step = svcntd();
-	
-	// No bit reversal needed for Stockham!
-	fft_timer.print_time("fft bit reversal done");
-	
+
 	// Pointers for ping-pong buffering
 	f64 *re_in = re, *im_in = im;
 	f64 *re_out = re_tmp, *im_out = im_tmp;
@@ -99,18 +95,33 @@ int main(int argc, char const * argv[]){
 	f64* im_tmp = new f64[n];
 	
 	for(u64 i = 0; i < n; ++i){
-		re[i] = 0.4269 * cos(2*pi*(f64)i/n) + cos(2*pi*3*(f64)i/n);
-		im[i] = 0.4269 * sin(2*pi*(f64)i/n) + sin(2*pi*3*(f64)i/n);
+		re[i] = 0;
+		im[i] = 0;
 	}
-	fft_timer.print_time("generated input");
 	
 	f64* cosines = new f64[n/2];
 	f64* sines = new f64[n/2];
 	init_roots(cosines, sines, n);
-	fft_timer.print_time("initialized vector of roots, starting fft");
 	
-	fft_stockham(re, im, re_tmp, im_tmp, cosines, sines, n);
-	fft_timer.print_time("fft done");
+	using std::chrono::high_resolution_clock;
+	using std::chrono::time_point;
+	
+	double minimum_time = std::numeric_limits<double>::max();
+	for(int r = 0; r < 16; r++){
+		auto startTime = high_resolution_clock::now();
+
+		fft_stockham(re, im, re_tmp, im_tmp, cosines, sines, n);
+
+		auto endTime = high_resolution_clock::now();
+
+		double elapsed = std::chrono::duration<double, std::nano>(endTime - startTime).count();
+
+		if (elapsed < minimum_time) {
+        	minimum_time = elapsed;
+    	}
+	}
+	cout << n << " " << minimum_time; 
+
 	
 #ifndef DONTPRINT
 	for(u64 i = 0; i < n; ++i) std::cout << re[i] << " " << im[i] << "\n";

@@ -3,8 +3,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cassert>
-#include "timer.h"
 #include "config.h"
+#include <chrono>
+#include <limits>
 using std::cout, std::endl;
 typedef uint64_t u64;
 typedef double f64;

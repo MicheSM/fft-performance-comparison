@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <cassert>
 #include <complex>
+#include <chrono>
+#include <limits>
 #include <arm_sve.h>
-#include "timer.h"
-#include "config.h"
 using std::cout, std::endl;
 typedef uint64_t u64;
 typedef double f64;
@@ -16,7 +16,6 @@ struct cf64{
 };
 
 const f64 pi = M_PI;
-timer fft_timer;
 
 inline cf64 operator+(const cf64& a, const cf64& b){
 	return {a.re+b.re, a.im+b.im};
@@ -137,17 +136,29 @@ int main(int argc, char const * argv[]){
 	cf64* wave_tmp = new cf64[n];
 	
 	for(u64 i = 0; i < n; ++i){
-		wave[i] = {0.4269 * cos(2*pi*(f64)i/n) + cos(2*pi*3*(f64)i/n), 
-		           0.4269 * sin(2*pi*(f64)i/n) + sin(2*pi*3*(f64)i/n)};
+		wave[i] = {0, 0};
 	}
-	fft_timer.print_time("generated input");
 	
 	cf64* roots = new cf64[n/2];
 	init_roots(roots, n);
-	fft_timer.print_time("initialized vector of roots, starting fft");
+	using std::chrono::high_resolution_clock;
+	using std::chrono::time_point;
 	
-	fft_stockham(wave, wave_tmp, roots, n);
-	fft_timer.print_time("fft done");
+	double minimum_time = std::numeric_limits<double>::max();
+	for(int r = 0; r < 16; r++){
+		auto startTime = high_resolution_clock::now();
+
+		fft_stockham(wave, wave_tmp, roots, n);
+
+		auto endTime = high_resolution_clock::now();
+
+		double elapsed = std::chrono::duration<double, std::nano>(endTime - startTime).count();
+
+		if (elapsed < minimum_time) {
+        	minimum_time = elapsed;
+    	}
+	}
+	cout << n << " " << minimum_time; 
 	
 #ifndef DONTPRINT
 	for(u64 i = 0; i < n; ++i) std::cout << wave[i].re << " " << wave[i].im << "\n";

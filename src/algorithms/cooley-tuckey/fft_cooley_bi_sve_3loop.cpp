@@ -4,14 +4,14 @@
 #include <cstdint>
 #include <cassert>
 #include <arm_sve.h>
-#include "timer.h"
+#include <chrono>
+#include <limits>
 #include "config.h"
 using std::cout, std::endl;
 typedef uint64_t u64;
 typedef double f64;
 
 const f64 pi = M_PI;
-timer fft_timer;
 
 void init_roots(f64* __restrict__ cosines, f64* __restrict__ sines, u64 n){
 	for(u64 i = 0; i < n/2; ++i) sines[i] = sin(-2*pi*(f64)i/n);
@@ -48,7 +48,7 @@ void fft(f64* __restrict__ re, f64* __restrict__ im, f64* __restrict__ cosines, 
 		svst1_scatter_index(swaps, im, rev_indices, sv_im);
 		svst1(swaps, &im[i], sv_rev_im);
 	}
-	fft_timer.print_time("fft bit reversal done");
+
 	for(u64 logp = 1; logp <= logn; ++logp){
 		u64 p = 1 << logp;
 		u64 halfp = p >> 1;
@@ -94,16 +94,33 @@ int main(int argc, char const * argv[]){
 	f64* re = new f64[n];
 	f64* im = new f64[n];
 	for(u64 i = 0; i < n; ++i){
-		re[i] = 0.4269 * cos(2*pi*(f64)i/n) + cos(2*pi*3*(f64)i/n);
-		im[i] = 0.4269 * sin(2*pi*(f64)i/n) + sin(2*pi*3*(f64)i/n);
+		re[i] = 0;
+		im[i] = 0;
 	}
-	fft_timer.print_time("generated input");
+	
 	f64* cosines = new f64[n/2];
 	f64* sines = new f64[n/2];
 	init_roots(cosines, sines, n);
-	fft_timer.print_time("initialized vector of roots, starting fft");
-	fft(re, im, cosines, sines, n);
-	fft_timer.print_time("fft done");
+	
+	using std::chrono::high_resolution_clock;
+	using std::chrono::time_point;
+	
+	double minimum_time = std::numeric_limits<double>::max();
+	for(int r = 0; r < 16; r++){
+		auto startTime = high_resolution_clock::now();
+
+		fft(re, im, cosines, sines, n);
+
+		auto endTime = high_resolution_clock::now();
+
+		double elapsed = std::chrono::duration<double, std::nano>(endTime - startTime).count();
+
+		if (elapsed < minimum_time) {
+        	minimum_time = elapsed;
+    	}
+	}
+	cout << n << " " << minimum_time; 
+	
 #ifndef DONTPRINT
 	for(u64 i = 0; i < n; ++i) std::cout << re[i] << " " << im[i] << "\n";
 #endif
