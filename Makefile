@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -static -Wall -std=c++20 -O2 -march=native \
+CXXFLAGS = -static -Wall -std=c++20 -O3 -march=native \
             -Isrc -Isrc/utils -Isrc/algorithms/cooley-tuckey -Isrc/algorithms/stockham -Iconfig
 VPATH = src src/algorithms/cooley-tuckey src/algorithms/stockham src/utils config
 
