@@ -118,7 +118,7 @@ int main(int argc, char const * argv[]){
 	using std::chrono::time_point;
 	
 	double minimum_time = std::numeric_limits<double>::max();
-	for(int r = 0; r < 8; r++){
+	for(int r = 0; r < 100; r++){
 		auto startTime = high_resolution_clock::now();
 
 		fft(re, im, cosines, sines, n);
