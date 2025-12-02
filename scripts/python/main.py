@@ -32,7 +32,7 @@ def load_algorithms(base_dir, algorithm_names):
 def create_plots(algorithms_data, colors, fmts, output_dir):
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    baseline_alg = 'output_fft_cooley_ci_novector'
+    baseline_alg = 'output_fft_stockham_ci_novector'
     baseline_data = algorithms_data[baseline_alg].groupby('N', as_index=False).mean()
 
     descriptions = [

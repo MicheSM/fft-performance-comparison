@@ -24,7 +24,7 @@ def load_algorithms(base_dir, algorithm_names):
             file_path,
             sep=' ',
             header=None,
-            names=["N", "time1", "time2", "time3", "time4", "time5", "time6", "time7", "time8", "time9"]
+            names=["N", "time"]
         )
     return data
 
@@ -37,27 +37,19 @@ def create_plots(algorithms_data, colors, fmts, output_dir):
 
     descriptions = [
         "N",
-        "generated input (since last split)",
-        "generate input (since start)",
-        "initialized vector of roots (since last split)",
-        "initialized vector of roots (since start)",
-        "bit reversal done (since last split)",
-        "bit reversal done (since start)",
-        "fft done (since last split)",
-        "fft done (since start)",
-        "finished (since start)"
+        "execution time"
     ]
 
     for checkpoint in range(1, 10):
         plt.figure(figsize=(15, 10))
-        baseline_col = baseline_data[f'time{checkpoint}']
+        baseline_col = baseline_data["time"]
 
         for name, df in algorithms_data.items():
             if name == baseline_alg:
                 continue
 
             alg_avg = df.groupby('N', as_index=False).mean()
-            ratio = alg_avg[f'time{checkpoint}'] / baseline_col
+            ratio = alg_avg["time"] / baseline_col
 
             plt.plot(
                 alg_avg['N'],
