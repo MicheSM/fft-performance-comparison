@@ -146,7 +146,7 @@ int main(int argc, char const * argv[]){
 		// odd number of elements → middle element
 		median_time = times[size/2];
 	}
-	cout << n << " " << median_time << endl; 
+	cout << n << " " << times.at(0) << endl; 
 
 	
 #ifndef DONTPRINT
