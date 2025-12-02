@@ -15,7 +15,6 @@ struct cf64{
 };
 
 const f64 pi = M_PI;
-timer fft_timer;
 
 inline cf64 operator+(const cf64& a, const cf64& b){
 	return {a.re+b.re, a.im+b.im};
@@ -64,7 +63,7 @@ void fft(cf64* __restrict__ wave, cf64* __restrict__ roots, u64 n){
 			std::swap(wave[i], wave[j]);
 		}
 	}
-	fft_timer.print_time("fft bit reversal done");
+
 	for(u64 logp = 1; logp <= logn; ++logp){
 		u64 p = 1 << logp;
 		u64 halfp = p >> 1;
@@ -93,12 +92,20 @@ int main(int argc, char const * argv[]){
 	for(u64 i = 0; i < n; ++i){
 		wave[i] = {0.4269 * cos(2*pi*(f64)i/n) + cos(2*pi*3*(f64)i/n), 0.4269 * sin(2*pi*(f64)i/n) + sin(2*pi*3*(f64)i/n)};
 	}
-	fft_timer.print_time("generated input");
+
 	cf64* roots = new cf64[n/2];
 	init_roots(roots, n);
-	fft_timer.print_time("initialized vector of roots, starting fft");
+	
+	using std::chrono::high_resolution_clock;
+	using std::chrono::time_point;
+	auto startTime = high_resolution_clock::now();
+	
 	fft(wave, roots, n);
-	fft_timer.print_time("fft done");
+	
+	auto endTime = high_resolution_clock::now();
+	double elapsed = std::chrono::duration<double, std::nano>(endTime - startTime).count();
+	cout << n << " " << elapsed << endl; 
+
 #ifndef DONTPRINT
 	for(u64 i = 0; i < n; ++i) std::cout << wave[i].re << " " << wave[i].im << "\n";
 #endif
