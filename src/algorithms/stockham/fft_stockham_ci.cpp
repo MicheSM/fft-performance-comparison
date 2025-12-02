@@ -5,6 +5,7 @@
 #include <cassert>
 #include <complex>
 #include <chrono>
+#include "config.h"
 #include <limits>
 using std::cout, std::endl;
 typedef uint64_t u64;

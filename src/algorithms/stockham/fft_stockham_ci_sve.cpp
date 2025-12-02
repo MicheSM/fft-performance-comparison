@@ -6,6 +6,7 @@
 #include <complex>
 #include <chrono>
 #include <limits>
+#include "config.h"
 #include <arm_sve.h>
 using std::cout, std::endl;
 typedef uint64_t u64;
