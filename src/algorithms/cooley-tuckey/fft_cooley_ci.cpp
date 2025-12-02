@@ -113,7 +113,7 @@ int main(int argc, char const * argv[]){
         	minimum_time = elapsed;
     	}
 	}
-	cout << n << " " << minimum_time; 
+	cout << n << " " << minimum_time << endl; 
 	
 	
 #ifndef DONTPRINT

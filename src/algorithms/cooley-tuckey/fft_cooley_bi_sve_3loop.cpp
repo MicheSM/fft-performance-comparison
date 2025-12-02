@@ -119,7 +119,7 @@ int main(int argc, char const * argv[]){
         	minimum_time = elapsed;
     	}
 	}
-	cout << n << " " << minimum_time; 
+	cout << n << " " << minimum_time << endl; 
 	
 #ifndef DONTPRINT
 	for(u64 i = 0; i < n; ++i) std::cout << re[i] << " " << im[i] << "\n";
